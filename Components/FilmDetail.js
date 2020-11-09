@@ -1,42 +1,115 @@
 // Components/FilmDetail.js
 
 import React from 'react'
-import { StyleSheet, TouchableOpacity, View, Text, ActivityIndicator, ScrollView, Image} from 'react-native'
-import { getFilmDetailFromApi, getImageFromApi } from '../API/TMDBApi'
+import {
+    ActivityIndicator,
+    Image,
+    Platform,
+    ScrollView,
+    Share,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native'
+import {getFilmDetailFromApi, getImageFromApi} from '../API/TMDBApi'
 import moment from 'moment'
 import numeral from 'numeral'
-import { connect } from 'react-redux'
+import {connect} from 'react-redux'
 
 class FilmDetail extends React.Component {
+
+    static navigationOptions = ({navigation}) => {
+        const {params} = navigation.state
+        // On accède à la fonction shareFilm et au film via les paramètres qu'on a ajouté à la navigation
+        if (params.film !== undefined && Platform.OS === 'ios') {
+            return {
+                // On a besoin d'afficher une image, il faut donc passe par une Touchable une fois de plus
+                headerRight: () => <TouchableOpacity
+                    style={styles.share_touchable_headerrightbutton}
+                    onPress={() => params.shareFilm()}>
+                    <Image
+                        style={styles.share_image}
+                        source={require('../Images/ic_share.png')}/>
+                </TouchableOpacity>
+            }
+        }
+    }
+
     constructor(props) {
         super(props)
         this.state = {
             film: undefined,
-            isLoading: true
+            isLoading: false
         }
+        this._shareFilm = this._shareFilm.bind(this)
     }
 
+    // Fonction pour faire passer la fonction _shareFilm et le film aux paramètres de la navigation. Ainsi on aura accès à ces données au moment de définir le headerRight
+    _updateNavigationParams() {
+        this.props.navigation.setParams({
+            shareFilm: this._shareFilm,
+            film: this.state.film
+        })
+    }
+
+    // Dès que le film est chargé, on met à jour les paramètres de la navigation (avec la fonction _updateNavigationParams) pour afficher le bouton de partage
     componentDidMount() {
+        const favoriteFilmIndex = this.props.favoritesFilm.findIndex(item => item.id === this.props.navigation.state.params.idFilm)
+        if (favoriteFilmIndex !== -1) {
+            this.setState({
+                film: this.props.favoritesFilm[favoriteFilmIndex]
+            }, () => {
+                this._updateNavigationParams()
+            })
+            return
+        }
+
+        this.setState({isLoading: true})
         getFilmDetailFromApi(this.props.navigation.state.params.idFilm).then(data => {
             this.setState({
                 film: data,
                 isLoading: false
+            }, () => {
+                this._updateNavigationParams()
             })
         })
     }
 
 
+    _displayFloatingActionButton() {
+        const {film} = this.state
+        if (film !== undefined && Platform.OS === 'android') {
+            // Uniquement sur Android et lorsque le film est chargé
+            return (
+                <TouchableOpacity
+                    style={styles.share_touchable_floatingactionbutton}
+                    onPress={() => this._shareFilm()}>
+                    <Image
+                        style={styles.share_image}
+                        source={require('../Images/ic_share.png')}/>
+                </TouchableOpacity>
+            )
+        }
+    }
+
+    _shareFilm() {
+        const {film} = this.state
+        Share.share({title: film.title, message: film.overview})
+    }
+
     _displayLoading() {
         if (this.state.isLoading) {
             return (
                 <View style={styles.loading_container}>
-                    <ActivityIndicator size='large' />
+                    <ActivityIndicator size='large'/>
                 </View>
             )
         }
     }
+
     _toggleFavorite() {
-        const action = { type: "TOGGLE_FAVORITE", value: this.state.film }
+        const action = {type: "TOGGLE_FAVORITE", value: this.state.film}
         this.props.dispatch(action)
     }
 
@@ -55,7 +128,7 @@ class FilmDetail extends React.Component {
     }
 
     _displayFilm() {
-        const { film } = this.state
+        const {film} = this.state
         if (film !== undefined) {
             return (
                 <ScrollView style={styles.scrollview_container}>
@@ -70,15 +143,16 @@ class FilmDetail extends React.Component {
                         {this._displayFavoriteImage()}
                     </TouchableOpacity>
                     <Text style={styles.description_text}>{film.overview}</Text>
-                    <Text style={styles.default_text}>Sorti le {moment(new Date(film.release_date)).format('DD/MM/YYYY')}</Text>
+                    <Text style={styles.default_text}>Sorti
+                        le {moment(new Date(film.release_date)).format('DD/MM/YYYY')}</Text>
                     <Text style={styles.default_text}>Note : {film.vote_average} / 10</Text>
                     <Text style={styles.default_text}>Nombre de votes : {film.vote_count}</Text>
                     <Text style={styles.default_text}>Budget : {numeral(film.budget).format('0,0[.]00 $')}</Text>
-                    <Text style={styles.default_text}>Genre(s) : {film.genres.map(function(genre){
+                    <Text style={styles.default_text}>Genre(s) : {film.genres.map(function (genre) {
                         return genre.name;
                     }).join(" / ")}
                     </Text>
-                    <Text style={styles.default_text}>Companie(s) : {film.production_companies.map(function(company){
+                    <Text style={styles.default_text}>Companie(s) : {film.production_companies.map(function (company) {
                         return company.name;
                     }).join(" / ")}
                     </Text>
@@ -92,6 +166,7 @@ class FilmDetail extends React.Component {
             <View style={styles.main_container}>
                 {this._displayLoading()}
                 {this._displayFilm()}
+                {this._displayFloatingActionButton()}
             </View>
         )
     }
@@ -129,25 +204,44 @@ const styles = StyleSheet.create({
         color: '#000000',
         textAlign: 'center'
     },
+    favorite_container: {
+        alignItems: 'center',
+    },
     description_text: {
         fontStyle: 'italic',
         color: '#666666',
         margin: 5,
         marginBottom: 15
     },
-    default_text: {
+    default_text: {
         marginLeft: 5,
         marginRight: 5,
         marginTop: 5,
     },
-    favorite_container: {
-        alignItems: 'center', // Alignement des components enfants sur l'axe secondaire, X ici
-    },
     favorite_image: {
         width: 40,
         height: 40
+    },
+    share_touchable_floatingactionbutton: {
+        position: 'absolute',
+        width: 60,
+        height: 60,
+        right: 30,
+        bottom: 30,
+        borderRadius: 30,
+        backgroundColor: '#e91e63',
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    share_image: {
+        width: 30,
+        height: 30
+    },
+    share_touchable_headerrightbutton: {
+        marginRight: 8
     }
 })
+
 const mapStateToProps = (state) => {
     return {
         favoritesFilm: state.favoritesFilm

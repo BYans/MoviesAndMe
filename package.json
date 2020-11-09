@@ -27,12 +27,14 @@
     "react-native-web": "^0.13.9",
     "react-navigation": "^4.4.0",
     "react-navigation-stack": "^2.8.2",
+    "react-platform": "^0.0.0",
     "react-redux": "^7.2.2",
     "redux": "^4.0.5"
   },
   "devDependencies": {
     "@babel/core": "^7.8.6",
-    "babel-preset-expo": "^8.1.0"
+    "babel-preset-expo": "^8.1.0",
+    "react-navigation-tabs": "^2.10.1"
   },
   "private": true
 }
